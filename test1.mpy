@@ -44,7 +44,7 @@ def web_page():
     html = """<!DOCTYPE html>
             <html>
             <head>
-                <title>Arrow Control</title>
+                <title>Car Control</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
                     body { 
@@ -76,16 +76,17 @@ def web_page():
                         border-radius: 5px;
                     }
                     .arrow-up::before {
-                        content: "↑";
+                        content: "\\2191"; /* ↑ */
                     }
                     .arrow-down::before {
-                        content: "↓";
+                        content: "\\2193"; /* ↓ */
                     }
                     .arrow-left::before {
-                        content: "←";
+                        content: "\\2190"; /* ← */
                     }
                     .arrow-right::before {
-                        content: "→";
+                        content: "\\2192"; /* → */
+                    }
                     }
                 </style>
                 <script>
