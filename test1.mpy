@@ -1,0 +1,194 @@
+try:
+    import usocket as socket    # socket module allow us to send response over network.
+except:
+    import socket
+from utime import sleep_ms, sleep
+import network 
+from machine import Pin
+import gc 
+
+try:
+    from bps_cre import *     
+except:
+    pass
+
+gc.collect()
+
+# led=Pin("LED",Pin.OUT) # for Raspberry Pi Pico
+led = Pin(2, Pin.OUT)   # for esp boards
+# pins for car motor
+ma1 = Pin(4, Pin.OUT)
+ma2 = Pin(16, Pin.OUT)
+mb1 = Pin(17, Pin.OUT)
+mb2 = Pin(5, Pin.OUT)
+
+ssid = bps_ssid     # your network/hotspot/ssid name.
+passw = bps_passw    # your network/hotspot/ssid password.
+
+# Connect to the network
+sta = network.WLAN(network.STA_IF) # station interface.
+sta.active(True)
+sta.connect(ssid, passw)  # connecting to network
+
+while not sta.isconnected():
+    pass
+
+if sta.isconnected():
+    print("Connection status:", sta.isconnected())
+    
+sta.ifconfig(('192.168.1.23', '255.255.255.0', '192.168.1.1', '218.248.112.65'))
+print(sta.ifconfig())
+print("http://192.168.1.23")
+
+def web_page():
+    html = """<!DOCTYPE html>
+            <html>
+            <head>
+                <title>Arrow Control</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { 
+                        background-color: darkslategray; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center; 
+                        height: 100vh; 
+                        margin: 0; 
+                        flex-direction: column;
+                    }
+                    h1 { 
+                        color: rgb(137, 185, 226); 
+                    }
+                    .button-container {
+                        display: flex;
+                        justify-content: center;
+                        margin: 20px 0;
+                    }
+                    button {
+                        display: inline-block;
+                        padding: 20px;
+                        font-size: 20px;
+                        margin: 10px;
+                        cursor: pointer;
+                        border: none;
+                        color: white;
+                        background-color: #4CAF50;
+                        border-radius: 5px;
+                    }
+                    .arrow-up::before {
+                        content: "↑";
+                    }
+                    .arrow-down::before {
+                        content: "↓";
+                    }
+                    .arrow-left::before {
+                        content: "←";
+                    }
+                    .arrow-right::before {
+                        content: "→";
+                    }
+                </style>
+                <script>
+                    function sendRequest(command) {
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("GET", "/?action=" + command, true);
+                        xhr.send();
+                    }
+                </script>
+            </head>
+            <body>
+                <h1>Arrow Control</h1>
+                <div class="button-container">
+                    <button class="arrow-up" onmousedown="sendRequest('forward')" onmouseup="sendRequest('stop')"></button>
+                </div>
+                <div class="button-container">
+                    <button class="arrow-left" onmousedown="sendRequest('left')" onmouseup="sendRequest('stop')"></button>
+                    <button class="arrow-right" onmousedown="sendRequest('right')" onmouseup="sendRequest('stop')"></button>
+                </div>
+                <div class="button-container">
+                    <button class="arrow-down" onmousedown="sendRequest('backward')" onmouseup="sendRequest('stop')"></button>
+                </div>
+            </body>
+            </html>
+
+            """
+    return html
+
+so = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+so.bind(("", 80))
+so.listen(5)
+
+while True:
+    try:
+        conn, addr = so.accept()
+        conn.settimeout(3.0)
+        print("Connection made %s" % str(addr))
+        request = conn.recv(1024)
+        conn.settimeout(None)
+        request = str(request)
+        print("Content = %s" % request)
+        car_lef = request.find("/?action=left")
+        car_rig = request.find("/?action=right")
+        car_for = request.find("/?action=forward")
+        car_bac = request.find("/?action=backward")
+        car_sto = request.find("/?action=stop")
+
+        print("\n car =", car_bac)
+        print("\n car =", car_for)
+        print("\n car =", car_lef)
+        print("\n car =", car_rig)
+        print("\n car =", car_bac)
+        print("\n car_St = ", car_sto)
+        # forward
+        if car_for == 6:
+            print("\n forward \n")
+            ma1.on()
+            ma2.off()
+            mb1.on()
+            mb2.off()
+            led.on()
+        # backward
+        if car_bac == 6:
+            print("\n backward \n")
+            ma1.off()
+            ma2.on()
+            mb1.off()
+            mb2.on()
+            led.off()
+        # left
+        if car_lef == 6:
+            print("\n left \n")
+            ma1.off()
+            ma2.on()
+            mb1.off()
+            mb2.off()
+            led.off()
+        # right
+        if car_rig == 6:
+            print("\n right \n")
+            ma1.off()
+            ma2.off()
+            mb1.on()
+            mb2.off()
+            led.on()
+        # stop
+        if car_sto == 6:
+            print("\n stop \n")
+            ma1.off()
+            ma2.off()
+            mb1.off()
+            mb2.off()
+            led.off()
+            sleep_ms(100)
+            led.on()
+            sleep_ms(100)
+
+        response = web_page()
+        conn.send('HTTP/1.1 200 OK\n')
+        conn.send('Content-Type: text/html\n')
+        conn.send('Connection: close\n\n')
+        conn.sendall(response)
+        conn.close()
+    except OSError as e:
+        conn.close()
+        print('Connection closed')
