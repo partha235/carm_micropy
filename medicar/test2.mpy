@@ -1,0 +1,228 @@
+try:
+    import usocket as socket    # socket module to allow sending response over network.
+except:
+    import socket
+from utime import sleep_ms, sleep
+import network 
+from machine import Pin, ADC
+import gc 
+try:
+    from bps_cre import *     
+except:
+    pass
+
+gc.collect()
+
+# LED for status indication
+led = Pin(2, Pin.OUT)
+
+# Pins for car motor
+ma1 = Pin(4, Pin.OUT)
+ma2 = Pin(16, Pin.OUT)
+mb1 = Pin(17, Pin.OUT)
+mb2 = Pin(5, Pin.OUT)
+
+# ADC for sensors
+temp_sensor = ADC(Pin(32))   # Temperature sensor pin
+heart_sensor = ADC(Pin(33))  # Heart rate sensor pin
+gas_sensor = ADC(Pin(34))    # Gas sensor pin
+
+ssid = bps_ssid     # your network/hotspot/ssid name.
+passw = bps_passw    # your network/hotspot/ssid password.
+
+# Connect to the network
+sta = network.WLAN(network.STA_IF) # Station interface.
+sta.active(True)
+sta.connect(ssid, passw)  # Connecting to the network.
+
+while not sta.isconnected():
+    pass
+
+if sta.isconnected():
+    print("Connection status:", sta.isconnected())
+    
+print(sta.ifconfig())
+
+def read_temperature():
+    # Simulating temperature reading for demo purposes.
+    temp_value = temp_sensor.read()
+    temperature = (temp_value / 4095.0) * 100  # Example conversion
+    return round(temperature, 2)
+
+def read_heart_rate():
+    # Simulating heart rate reading for demo purposes.
+    heart_value = heart_sensor.read()
+    heart_rate = (heart_value / 4095.0) * 100  # Example conversion
+    return round(heart_rate, 2)
+
+def read_gas_sensor():
+    # Simulating gas sensor reading for demo purposes.
+    gas_value = gas_sensor.read()
+    gas_concentration = (gas_value / 4095.0) * 100  # Example conversion
+    return round(gas_concentration, 2)
+
+def web_page():
+    temperature = read_temperature()
+    heart_rate = read_heart_rate()
+    gas_concentration = read_gas_sensor()
+    
+    html = """<!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Medi-car</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body { 
+                            background-color: darkslategray; 
+                            display: flex; 
+                            justify-content: center; 
+                            align-items: center; 
+                            height: 100vh; 
+                            margin: 0; 
+                            flex-direction: column;
+                        }
+                        h1 { 
+                            color: rgb(137, 185, 226); 
+                        }
+                        .sensor-data {
+                            margin-top: 20px;
+                            color: white;
+                            text-align: center;
+                        }
+                        .button-container {
+                            display: flex;
+                            justify-content: center;
+                            margin: 20px 0;
+                        }
+                        button {
+                            display: inline-block;
+                            padding: 20px;
+                            font-size: 20px;
+                            margin: 10px;
+                            cursor: pointer;
+                            border: none;
+                            color: white;
+                            background-color: #4CAF50;
+                            border-radius: 5px;
+                        }
+                        .arrow-up::before {
+                        content: "\\2191"; /* ↑ */
+                    }
+                    .arrow-down::before {
+                        content: "\\2193"; /* ↓ */
+                    }
+                    .arrow-left::before {
+                        content: "\\2190"; /* ← */
+                    }
+                    .arrow-right::before {
+                        content: "\\2192"; /* → */
+                    }
+                    </style>
+                    <script>
+                        function sendRequest(command) {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open("GET", "/?action=" + command, true);
+                            xhr.send();
+                        }
+                    </script>
+                </head>
+                <body>
+                    <h1>Medi-car</h1>
+                    <div class="button-container">
+                        <button class="arrow-up" onmousedown="sendRequest('forward')" onmouseup="sendRequest('stop')"></button>
+                    </div>
+                    <div class="button-container">
+                        <button class="arrow-left" onmousedown="sendRequest('left')" onmouseup="sendRequest('stop')"></button>
+                        <button class="arrow-right" onmousedown="sendRequest('right')" onmouseup="sendRequest('stop')"></button>
+                    </div>
+                    <div class="button-container">
+                        <button class="arrow-down" onmousedown="sendRequest('backward')" onmouseup="sendRequest('stop')"></button>
+                    </div>
+                    <div class="sensor-data">
+                        <p>Temperature: """ + str(temperature) + """ °C</p>
+                        <p>Heart Rate: """ + str(heart_rate) + """ BPM</p>
+                        <p>Gas Concentration: """ + str(gas_concentration) + """ %</p>
+                    </div>
+                </body>
+                </html>
+                """
+    return html
+
+so = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+so.bind(("", 80))
+so.listen(5)
+
+while True:
+    try:
+        conn, addr = so.accept()
+        conn.settimeout(3.0)
+        print("Connection made %s" % str(addr))
+        request = conn.recv(1024)
+        conn.settimeout(None)
+        request = str(request)
+        print("Content = %s" % request)
+        car_lef = request.find("/?action=left")
+        car_rig = request.find("/?action=right")
+        car_for = request.find("/?action=forward")
+        car_bac = request.find("/?action=backward")
+        car_sto = request.find("/?action=stop")
+
+        print("\n car =", car_bac)
+        print("\n car =", car_for)
+        print("\n car =", car_lef)
+        print("\n car =", car_rig)
+        print("\n car =", car_bac)
+        print("\n car_St = ", car_sto)
+        # forward
+        if car_for == 6:
+            print("\n forward \n")
+            ma1.on()
+            ma2.off()
+            mb1.on()
+            mb2.off()
+            led.on()
+        # backward
+        if car_bac == 6:
+            print("\n backward \n")
+            ma1.off()
+            ma2.on()
+            mb1.off()
+            mb2.on()
+            led.off()
+        # left
+        if car_lef == 6:
+            print("\n left \n")
+            ma1.off()
+            ma2.on()
+            mb1.off()
+            mb2.off()
+            led.off()
+        # right
+        if car_rig == 6:
+            print("\n right \n")
+            ma1.off()
+            ma2.off()
+            mb1.on()
+            mb2.off()
+            led.on()
+        # stop
+        if car_sto == 6:
+            print("\n stop \n")
+            ma1.off()
+            ma2.off()
+            mb1.off()
+            mb2.off()
+            led.off()
+            sleep_ms(100)
+            led.on()
+            sleep_ms(100)
+
+        response = web_page()
+        conn.send('HTTP/1.1 200 OK\n')
+        conn.send('Content-Type: text/html\n')
+        conn.send('Connection: close\n\n')
+        conn.sendall(response)
+        conn.close()
+    except OSError as e:
+        conn.close()
+        print('Connection closed')
