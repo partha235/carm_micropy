@@ -1,0 +1,25 @@
+from machine import Pin, time_pulse_us
+from utime import sleep_us, sleep_ms
+
+trip=Pin(16,Pin.OUT)
+echp=Pin(17,Pin.IN)
+
+SOUND_SPEED=340
+dis_ob=[]
+
+while True:
+    trip.value(0)
+    sleep_us(5)
+
+    trip.value(1)
+    sleep_us(10)
+    trip.value(0)
+
+    ultrason_duration = time_pulse_us(echp, 1, 30000) 
+    distance_cm = SOUND_SPEED * ultrason_duration / 20000
+    dis_ob.append(distance_cm)
+
+    print(f"Distance : {distance_cm} cm")
+    print("dis_ob = ",dis_ob)
+    print("x = ", dis_ob[-1])
+    sleep_ms(500)
