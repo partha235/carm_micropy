@@ -1,0 +1,2 @@
+# Speed_check
+this folder contains codes for speed monitor of vehicle that follows back side of our vehicle. It use ultrasonic sensor and measure the change of distance with respect to time and make an alert. 
