@@ -8,6 +8,7 @@ from machine import Pin, ADC
 import gc 
 from machine import UART
 import utime, time
+import onewire, ds18x20
 try:
     from bps_cre import *     
 except:
@@ -19,13 +20,23 @@ gc.collect()
 led = Pin(2, Pin.OUT)
 
 # Pins for car motor
-ma1 = Pin(4, Pin.OUT)
-ma2 = Pin(16, Pin.OUT)
-mb1 = Pin(17, Pin.OUT)
-mb2 = Pin(5, Pin.OUT)
+ma1 = Pin(13, Pin.OUT)
+ma2 = Pin(12, Pin.OUT)
+mb1 = Pin(14, Pin.OUT)
+mb2 = Pin(27, Pin.OUT)
+
+# enable 
+e1= Pin(5,Pin.OUT)
+e2= Pin(18,Pin.OUT)
 
 # ADC for sensors
-temp_sensor = ADC(Pin(32))   # Temperature sensor pin
+ds_pin = Pin(15)
+ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))   # Temperature sensor pin
+
+
+roms = ds_sensor.scan()
+print('Found DS devices: ', roms)
+
 heart_sensor = ADC(Pin(33))  # Heart rate sensor pin
 gas_sensor = ADC(Pin(34))    # Gas sensor pin
 
@@ -46,10 +57,7 @@ if sta.isconnected():
 print(sta.ifconfig())
 print("http://{}".format(sta.ifconfig()[0]))
 
-gpsModule = UART(2, baudrate=9600)
-print(gpsModule)
 
-buff = bytearray(255)
 
 TIMEOUT = False
 FIX_STATUS = False
@@ -60,48 +68,14 @@ satellites = ""
 GPStime = ""
 x = ""  # Initialize x to an empty string
 
-def getGPS(gpsModule):
-    global FIX_STATUS, TIMEOUT, latitude, longitude, satellites, GPStime
-    
-    timeout = time.time() + 8 
-    while True:
-        gpsModule.readline()
-        buff = str(gpsModule.readline())
-        parts = buff.split(',')
-    
-        if (parts[0] == "b'$GPGGA" and len(parts) == 15):
-            if(parts[1] and parts[2] and parts[3] and parts[4] and parts[5] and parts[6] and parts[7]):
-                print(buff)
-                
-                latitude = convertToDegree(parts[2])
-                if (parts[3] == 'S'):
-                    latitude = -latitude
-                longitude = convertToDegree(parts[4])
-                if (parts[5] == 'W'):
-                    longitude = -longitude
-                satellites = parts[7]
-                GPStime = parts[1][0:2] + ":" + parts[1][2:4] + ":" + parts[1][4:6]
-                FIX_STATUS = True
-                break
-                
-        if (time.time() > timeout):
-            TIMEOUT = True
-            break
-        # utime.sleep_ms(500)
-        
-def convertToDegree(RawDegrees):
-
-    RawAsFloat = float(RawDegrees)
-    firstdigits = int(RawAsFloat/100) 
-    nexttwodigits = RawAsFloat - float(firstdigits*100) 
-    
-    Converted = float(firstdigits + nexttwodigits/60.0)
-    Converted = '{0:.6f}'.format(Converted) 
-    return str(Converted)
 
 def read_temperature():
-    temp_value = temp_sensor.read()
-    temperature = (temp_value / 4095.0) * 100  # Example conversion
+    ds_sensor.convert_temp()
+    time.sleep_ms(750)
+    for rom in roms:
+      print(rom)
+      print(ds_sensor.read_temp(rom))
+    temperature = ds_sensor.read_temp(rom)
     return round(temperature, 2)
 
 def read_heart_rate():
@@ -115,7 +89,6 @@ def read_gas_sensor():
     return round(gas_concentration, 2)
 
 def web_page():
-    print(f"https://gps-coordinates.org/my-location.php?lat={latitude}&lng={longitude}")
     global x  # Ensure x is used from global scope
     temperature = read_temperature()
     heart_rate = read_heart_rate()
@@ -126,7 +99,6 @@ def web_page():
 <head>
     <title>Medi-car</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh"content="0.1">
     <style>
         body { 
             background-color: darkslategray; 
@@ -210,25 +182,9 @@ so.listen(5)
 
 while True:
     try:
-        getGPS(gpsModule)
-
-        if FIX_STATUS:
-            print("Printing GPS data...")
-            print(" ")
-            print("Latitude: " + latitude)
-            print("Longitude: " + longitude)
-            print("Satellites: " + satellites)
-            print("Time: " + GPStime)
-            print("----------------------")
-            print(f"https://gps-coordinates.org/my-location.php?lat={latitude}&lng={longitude}")
-            x = f"https://gps-coordinates.org/my-location.php?lat={latitude}&lng={longitude}"
-            FIX_STATUS = False
-
-        if TIMEOUT:
-            print("No GPS data is found.")
-            x=f"https://gps-coordinates.org/my-location.php?lat=11.225875082474557&lng=79.7386688603157"
-            TIMEOUT = False
-
+        e1.on()
+        e2.on()
+        x=f"https://gps-coordinates.org/my-location.php?lat=11.225875082474557&lng=79.7386688603157"
         conn, addr = so.accept()
         conn.settimeout(3.0)
         print("Connection made %s" % str(addr))
@@ -244,6 +200,8 @@ while True:
 
         # forward
         if car_for != -1:
+            e1.on()
+            e2.on()
             print("\n forward \n")
             ma1.on()
             ma2.off()
@@ -252,6 +210,8 @@ while True:
             led.on()
         # backward
         elif car_bac != -1:
+            e1.on()
+            e2.on()
             print("\n backward \n")
             ma1.off()
             ma2.on()
@@ -260,6 +220,8 @@ while True:
             led.off()
         # left
         elif car_lef != -1:
+            e1.on()
+            e2.on()
             print("\n left \n")
             ma1.off()
             ma2.on()
@@ -268,6 +230,8 @@ while True:
             led.off()
         # right
         if car_rig == 6:
+            e1.on()
+            e2.on()
             print("\n right \n")
             ma1.off()
             ma2.off()
@@ -276,6 +240,8 @@ while True:
             led.on()
         # stop
         if car_sto == 6:
+            e1.on()
+            e2.on()
             print("\n stop \n")
             ma1.off()
             ma2.off()
