@@ -1,4 +1,4 @@
-# program with web control button for car. 
+# program with web control button for car with Station mode. 
 
 try:
     import usocket as socket    # socket module allow us to send response over network.
